@@ -1,13 +1,13 @@
 # timepot
 Time marker & report for page performance testing.
 
-用于性能测速的打点统计及上报。
+用于 Web 页面性能测速的打点统计及上报。
 
 [English Version](README.md)(@todo) | [中文版](README_CN.md)
 
 ## 快速上手
 
-[示例代码](examples/demo.html)，打开开发者工具 console 查看。
+[示例代码](examples/demo.html)
 
 **1. 安装**
 
@@ -68,7 +68,7 @@ timepot.mark('end', { group: 'page' });
 * 支持延时、批量上报
 * 支持`navigator.sendBeacon()`上报
 
-根据 [Navigation Timing Processing Model](https://w3c.github.io/navigation-timing/#processing-model)，对 [RUM](https://en.wikipedia.org/wiki/Real_user_monitoring) 进行计算的关键路径指标 [CRP](https://developers.google.com/web/fundamentals/performance/critical-rendering-path/measure-crp) 如下表。
+根据 [Navigation Timing Processing Model](https://w3c.github.io/navigation-timing/#processing-model)，对 [RUM](https://en.wikipedia.org/wiki/Real_user_monitoring) 进行计算的关键渲染路径指标 [CRP](https://developers.google.com/web/fundamentals/performance/critical-rendering-path/measure-crp) 如下表。
 
 
 | 指标       | 计算方法                               | 含义
@@ -87,7 +87,7 @@ timepot.mark('end', { group: 'page' });
 | `DOMComplete` | .domComplete - .domLoading        | 页面和所有子资源准备就绪
 | `loadEvent`   | .loadEventEnd - .loadEventStart   | onload事件的执行耗时
 | `total`       | .loadEventEnd - .navigationStart  | 以上总耗时（因有重叠，非加总）
-| `more`        | @todo                             | 更多指标增加中，如资源加载总耗时
+| more          | @todo                             | 更多指标增加中，如资源加载总耗时
 
 
 ## 设计原理
@@ -125,7 +125,7 @@ Point = {
 
 **内置分组**
 
-- timepot.GROUP_DEFAULT：'default'，匿名分组
+- timepot.GROUP_DEFAULT：'default'，匿名分组，未命名的mark数据都会在此分组下
 - timepot.GROUP_PERFORMANCE：'performance'，performance timing原始数据分组
 - timepot.GROUP_AUDITS：'audits'，常见性能指标分组
 
