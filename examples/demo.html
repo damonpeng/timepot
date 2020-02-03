@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="format-detection" content="email=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>timepot demo</title>
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <script type="text/javascript">
+        window.timepot = window.timepot || [];
+        timepot.mark = timepot.mark || function(name, point) {
+            !point && (point = {});
+            name && (point.name = name);
+            point.time = Date.now();
+            timepot.push(point);
+        };
+    </script>
+    <script type="text/javascript">
+        timepot.mark('t0');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.mark('t1');
+        timepot.mark();
+    </script>
+    <script type="text/javascript" src="../timepot.js"></script>
+</head>
+<body>
+    <div style="margin: 20px auto; text-align: center;">
+        <div>Press `F12` to open console, and refresh this page to see the result.</div>
+        <div><a href="https://github.com/damonpeng/timepot"> &lt; Back to Timepot</a></div>
+    </div>
+    <script type="text/javascript">
+        timepot.mark('logicStart', { group: 'page' });
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.mark('logicEnd', { group: 'page' });
+
+        timepot.timing().then(result => {
+            timepot.console();
+            // console.log('timing result', result);
+            
+            timepot.report('?', result, {delay: 500});
+        });
+    </script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 /**
- * 
+ * Time marker & report for page performance testing.
+ * @license MIT
+ * @author damonpeng@qq.com
  */
 (function() {
     // Essentially, a timepot is an array of time points with multiple custom attributes and methods.
@@ -113,37 +115,43 @@
         }
     }
 
-    // preset group name
-    timepot.GROUP_DEFAULT = 'default';
-    timepot.GROUP_PERFORMANCE = 'performance';
-    timepot.GROUP_AUDITS = 'audits';
-
-    
-
-    // global config
-    timepot.config = {
-        NAMESPACE: 'timepot',   // global name space
-        ENABLE_PERFORMANCE: true,   //  if need performance data
-        ENABLE_SEND_BEACON: true,        // enable report data to server through navigator.sendBeacon
-        QUEUE_DELAY_LENGTH : 10,
-        QUEUE_DELAY_TIME: 200,   // ms
-        QUEUE_SEND_MAX_COUNT: 10,   // maxium send count
-    };
-
     /**
      * initialize
      */
-    timepot.init = function() {
+    var init = function() {
         // load data of fake timepot
         if (timepot.length > 0) {
             for (var i=0, l=timepot.length; i<l; i++) {
-                var group = timepot[i].group || timepot.GROUP_DEFAULT;
+                var group;
+
+                !timepot[i].group && (timepot[i].group = timepot.GROUP_DEFAULT);
+                group = timepot[i].group;
+
+                !timepot[i].name && (timepot[i].name = '');
+
+                !timepot[i].duration && (timepot[i].duration = i > 0 ? timepot[i].time - timepot[i-1].time : 0);
+
                 !gGroupTimepot[group] && (gGroupTimepot[group] = []);
                 gGroupTimepot[group].push(timepot[i]);
             }
         }
 
         gLastReportTime = getCurrentMsTime();
+    };
+
+    // preset group name
+    timepot.GROUP_DEFAULT = 'default';
+    timepot.GROUP_PERFORMANCE = 'performance';
+    timepot.GROUP_AUDITS = 'audits';
+
+    // global config
+    timepot.config = {
+        NAMESPACE: 'timepot',   // global name space
+        ENABLE_PERFORMANCE: true,   //  if need performance data
+        ENABLE_SEND_BEACON: true,        // enable report data to server through navigator.sendBeacon
+        REPORT_DELAY_TIME: 200   // ms
+        // QUEUE_DELAY_LENGTH : 5,
+        // QUEUE_SEND_MAX_COUNT: 5,   // maxium send count
     };
 
     /**
@@ -399,21 +407,25 @@
         }
     };
 
-    timepot.report = function(url, options) {
+    timepot.report = function(url, data, options) {
         var now = getCurrentMsTime(),
+            delay,
             config = timepot.config,
-            length = timepot.length,
+            // length = timepot.length,
             deltaTime = now - gLastReportTime;
 
         !options && (options = {});
 
-        // 实时、累积条数或时间，哪个先到都能触发一次上报
-        if (
-            options.delay === 0 ||
-            length >= config.QUEUE_DELAY_LENGTH || deltaTime >= config.QUEUE_DELAY_TIME
-        ) {
-            var data = timepot.splice(0, Math.min(length, config.QUEUE_SEND_MAX_COUNT));
+        delay = 'delay' in options ? options.delay : config.REPORT_DELAY_TIME;
 
+        // 实时、延时触发一次上报
+        if (
+            // delay === 0 ||
+            // length >= config.QUEUE_DELAY_LENGTH ||
+            deltaTime >= delay
+        ) {
+            // var data = timepot.splice(0, Math.min(length, config.QUEUE_SEND_MAX_COUNT));
+            // @todo 未来得及发送的，在beforeunload时触发
             // @todo data handler AOP
 
             clearTimeout(gTimerRunReport);
@@ -426,8 +438,8 @@
             clearTimeout(gTimerRunReport);
 
             gTimerRunReport = setTimeout(() => {
-                timepot.report();
-            }, config.QUEUE_DELAY_TIME - deltaTime);
+                timepot.report(url, data, options);
+            }, Math.max(0, delay - deltaTime));
         }
     };
 
@@ -443,8 +455,6 @@
         } else {
             result = endMark.time - startMark.time;
         }
-
-        // result = timepot
 
         return result;
     };
@@ -473,26 +483,30 @@
 
     /**
      * Load time marker data before timepot initialized.
+     * @todo not supported
      */
+    /*
     timepot.load = function(data) {
         if (isArray(data)) {
             for(var i=data.length; i>=0; i--) {
-                timepot.unshift(data[i]);
+                timepot.mark(data[i].name||'', data[i]);  // @todo unshift
+                // timepot.unshift(data[i]);
             }
         }
     };
+    */
 
     /**
      * clear timepot data
      */
-    timepot.clear = function(point) {
+    timepot.clear = function() {
         timepot = [];
         gGroupTimepot = {};
         gTimerRunReport = null;
     };
 
     // entrace
-    timepot.init();
+    init();
 
     return timepot;
 })();
