@@ -22,6 +22,7 @@
         };
     </script>
     <script type="text/javascript">
+        // statistics before timepot loaded
         timepot.mark('t0');
         for (var i=0; i<Math.random()*1e12; i++) {
         }
@@ -36,11 +37,25 @@
         <div><a href="https://github.com/damonpeng/timepot"> &lt; Back to Timepot</a></div>
     </div>
     <script type="text/javascript">
+        // mark mode
         timepot.mark('logicStart', { group: 'page' });
         for (var i=0; i<Math.random()*1e12; i++) {
         }
         timepot.mark('logicEnd', { group: 'page' });
 
+        // stopwatch mode
+        timepot.start('stopwatch');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.tick('stopwatch');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.tick('stopwatch');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.stop('stopwatch');
+
+        // result
         timepot.timing().then(result => {
             timepot.console();
             // console.log('timing result', result);

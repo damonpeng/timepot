@@ -32,7 +32,7 @@ timepot.timing().then(function(result) {
 
 **3. 进阶**
 
-**统计引入`timepot`之前的时间测速**
+**[统计引入`timepot`之前的时间测速]**
 
 在文档开始处（如<head>)预埋小段代码，加载`timepot`后，对应的数据不会丢失；在完成`timepot`加载前，仅支持`timepot.mark()`方法。
 
@@ -48,7 +48,7 @@ timepot.timing().then(function(result) {
 </script>
 ```
 
-**在一个页面区分多个统计实例**
+**[在一个页面区分多个统计实例]**
 
 需要对每个实例进行命名，以group区分。
 
@@ -59,8 +59,25 @@ timepot.mark('end', { group: 'page' });
 ```
 如上，则以`page`聚拢此组统计，可通过`timepot.getGroup('page')`得到测速结果。
 
+**4. 两种模式**
+
+**[打点模式]**
+
+打点模式，关注每次打点的命名，支持完整 Point 参数的传递，方便统计区分。
+
+在需要的时候，调用`timepot.mark()`即可。
+
+**[秒表模式]**
+
+秒表模式，简化版，仅关注本次计时的 group 名称，不关心每个打点的命名，自动采用 `tick + index` 递增命名。
+
+1. 在开始统计时，`timepot.start('groupName')`，一个 groupName 仅调用一次
+2. 在需要打点处，`timepot.tick('groupName')`，可多次调用 tick
+3. 在结束统计时，`timepot.stop('groupName')`，一个 groupName 仅调用一次
+
 ## 特点
 
+* 简单易用，两种模式：打点模式和秒表模式
 * 多节点：随时需要，随时`mark`
 * 多实例：按`group`名称分组统计，互不干扰
 * 对接 performance.timing API
@@ -134,13 +151,14 @@ Point = {
 | 方法                         | 作用 | 参数解释
 |-----------------------------|------|-----------------
 | `timepot.mark(name, point)` | 打点 | `name`: Optional，打点名称，无则匿名，会被统计为default分组；`point`：Optional，打点的其余信息
-| `timepot.timing()`          | 统计耗时，Promise 接口 | -
-| `timepot.getGroup(group)`   | 按分组获取测速数据 | `group`：required，String，分组名称
+| `timepot.timing()`          | 统计耗时，Promise 接口  | -
+| `timepot.start(group)`      | 计时器，开始            | `group`：required，String
+| `timepot.tick(group)`       | 计时器，打下一个计时点    | `group`：required，String，值同start
+| `timepot.stop(group)`       | 计时器，结束            | `group`：required，String，值同start
+| `timepot.getGroup(group)`   | 按分组获取测速数据       | `group`：required，String，分组名称
 | `timepot.console()`         | 以表格形式在控制台打印测速数据 | -
-| `timepot.start(group)`      | 计时器，开始 | `group`：required，String
-| `timepot.stop(group)`       | 计时器，结束 | `group`：required，String，值同start
-| `timepot.clear`             | 清除所有测速数据 | -
-| `timepot.report(url, data, options)` | 上报数据 | `url`：上报的服务端地址；`data`：上报的数据内容；`options`：选项，`options.delay`本次上报需要延时的时间
+| `timepot.clear`             | 清除所有测速数据         | -
+| `timepot.report(url, data, options)` | 上报数据       | `url`：上报的服务端地址；`data`：上报的数据内容；`options`：选项，`options.delay`本次上报需要延时的时间
 
 
 ## 使用场景

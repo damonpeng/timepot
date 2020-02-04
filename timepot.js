@@ -8,7 +8,8 @@
     var timepot,
         gGroupTimepot = {},
         gTimerRunReport = null,
-        gLastReportTime;
+        gLastReportTime,
+        gTickIndexMapping = {};
 
     if (window.timepot) {
         timepot = window.timepot;
@@ -180,6 +181,7 @@
                 currentTime>0 && previousTime>0 ? currentTime - previousTime : 0
             )
         };
+        point.context && (marker.context = point.context);
 
         timepot.push(marker);
 
@@ -468,14 +470,22 @@
     };
 
     /**
-     * t0 time
+     * start
      */
     timepot.start = function(group) {
-        timepot.mark('start', { group: group} );
+        timepot.mark('start', { group: group });
     };
 
     /**
-     * end this statistics
+     * tick
+     */
+    timepot.tick = function(group) {
+        !(group in gTickIndexMapping) && (gTickIndexMapping[group] = -1);
+        timepot.mark('tick' + (++gTickIndexMapping[group]), { group: group });
+    };
+
+    /**
+     * stop
      */
     timepot.stop = function(group) {
         timepot.mark('stop', { group: group} );
