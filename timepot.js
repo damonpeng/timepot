@@ -45,6 +45,16 @@
     };
 
     /**
+     * Convert to camel case variable
+     * @param {String} str 
+     */
+    var convertToCamelCase = function(str) {
+        return str.replace(/\-{1,}(\w)/g,function (matched, word){
+            return word.toUpperCase();
+        });
+    };
+
+    /**
      * Get current time in ms.
      */
     var getCurrentMsTime = function() {
@@ -52,10 +62,26 @@
     };
 
     /**
+     * Get performance api
+     */
+    var getPerformanceAPI = function() {
+        return window.performance || window.msPerformance || window.webkitPerformance;
+    };
+
+    /**
      * Get performance timing api
      */
-    var getTimingAPI = function() {
-        return (window.performance || window.msPerformance || window.webkitPerformance || {}).timing;
+    var getPerformanceTimingData = function() {
+        return (getPerformanceAPI() || {}).timing;
+    };
+
+    /**
+     * Get performance timing api
+     */
+    var getPerformanceEntriesData = function() {
+        var performanceAPI = getPerformanceAPI();
+
+        return performanceAPI ? performanceAPI.getEntries() : {};
     };
 
     /**
@@ -223,7 +249,7 @@
      * Get performance data
      */
     timepot.performance = function() {
-        var timing = getTimingAPI();
+        var timing = getPerformanceTimingData();
 
         if (! timing) {
             return false;
@@ -266,11 +292,8 @@
         }
     };
 
-    /**
-     * performance audits
-     */
-    timepot.audits = function() {
-        var timing = getTimingAPI(), group = timepot.GROUP_AUDITS;
+    var auditsPerformanceTiming = function() {
+        var timing = getPerformanceTimingData(), group = timepot.GROUP_AUDITS;
 
         if (! timing) {
             return false;
@@ -367,6 +390,7 @@
                 duration: timing.loadEventEnd - timing.loadEventStart
             });
 
+            // @todo name
             timepot.mark('total', {
                 group: group,
                 time: timing.loadEventEnd,
@@ -377,9 +401,106 @@
         return true;
     };
 
-        // timepot.getResourceTiming = 
-        // @todo performance.getEntries() 展示最耗费时间的资源
+    var auditsPerformanceEntries = function() {
+        var group = timepot.GROUP_AUDITS,
+            entries = getPerformanceEntriesData();
 
+        if (! entries) {
+            return false;
+        }
+
+        for (var i=0, l=entries.length; i<l; i++) {
+            var entry = entries[i];
+
+            // https://developer.mozilla.org/en-US/docs/Web/API/PerformanceEntry/entryType
+            /*
+            - frame, navigation: the document's address.
+            - resource: requested resource.
+            - mark: when the mark was created by calling performance.mark().
+            - measure: when the measure was created by calling performance.measure().
+            - paint: Either 'first-paint' or 'first-contentful-paint'.
+            - longtask: reports instances of long tasks
+            */
+            switch(entry.entryType) {
+                case 'frame':
+                case 'navigation':
+                    break;
+
+                case 'resource':
+                    var domain = entry.name.match(/:\/\/([^/]*)/)[1];
+                    // DNS time for different domains
+                    
+                    // transmission time for different domains
+                    // entry.responseEnd - entry.requestStart;
+
+                    // https://webplatform.github.io/docs/apis/resource_timing/PerformanceResourceTiming/initiatorType/
+                    /*
+                    - css: The initiator is any CSS resource downloaded via the url() syntax, such as @import url(), background: url(), etc.
+                    - embed: The initiator is the src attribute of the HTML <embed> element.
+                    - img: The initiator is the src attribute of the HTML <img> element.
+                    - link: The initiator is the href attribute of the HTML <link> element.
+                    - object: The initiator is the data attribute of the HTML <object> element.
+                    - script: The initiator is the src attribute of the HTML <script> element.
+                    - subdocument: The initiator is the src attribute of the HTML <frame> or HTML <iframe> elements.
+                    - svg: The initiator is the <svg> element and all resources downloaded as children of the <svg> element.
+                    - xmlhttprequest: The initiator is a XMLHttpRequest object.
+                    - other: The initiator is not of any type listed above.
+                    */
+                    switch (entry.initiatorType) {
+                        case 'img':
+                            // @size test
+                            // @time test
+                            break;
+
+                        case 'link':
+                            break;
+                            
+                        case 'script':
+                            // timepot.mark(, {
+
+                            // });
+                            break;
+                    }
+
+                    timepot.mark(domain, {
+                        group: group,
+                        time: entry.domainLookupEnd,
+                        duration: entry.domainLookupEnd - entry.domainLookupStart
+                    });
+                    break;
+
+                case 'mark':
+                    break;
+
+                case 'measure':
+                    break;
+
+                case 'paint':
+                    timepot.mark(convertToCamelCase(entry.name), {
+                        group: group,
+                        // @todo value fix
+                        time: entry.startTime,
+                        duration: entry.duration
+                    });
+                    break;
+
+                case 'longtask':
+                    break;
+            }
+        }
+
+
+
+        return true;
+    };
+
+    /**
+     * performance audits
+     */
+    timepot.audits = function() {
+        auditsPerformanceTiming();
+        // auditsPerformanceEntries();
+    };
 
     /**
      * Get timing data by group
