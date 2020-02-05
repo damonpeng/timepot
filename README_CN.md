@@ -80,10 +80,11 @@ timepot.mark('end', { group: 'page' });
 * 简单易用，两种模式：打点模式和秒表模式
 * 多节点：随时需要，随时`mark`
 * 多实例：按`group`名称分组统计，互不干扰
-* 对接 performance.timing API
-* 支持常见性能评估指标
+* 数据完整：对接 performance 数据，优先基于`PerformanceObserver`获取完整数据
+* 支持常见性能评估指标，对表Google [RAIL 性能模型](https://developers.google.com/web/fundamentals/performance/rail)
 * 支持延时、批量上报
 * 支持`navigator.sendBeacon()`上报
+* 剩余未上报内容将会在`unload`发送（@todo）
 
 根据 [Navigation Timing Processing Model](https://w3c.github.io/navigation-timing/#processing-model)，对 [RUM](https://en.wikipedia.org/wiki/Real_user_monitoring) 进行计算的关键渲染路径指标 [CRP](https://developers.google.com/web/fundamentals/performance/critical-rendering-path/measure-crp) 如下表。
 
@@ -103,8 +104,11 @@ timepot.mark('end', { group: 'page' });
 | `DOMContentLoadedEvent`| .domContentLoadedEventEnd - .domContentLoadedEventStart | [DOMContentLoaded事件](https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event)的执行耗时
 | `DOMComplete` | .domComplete - .domLoading        | 页面和所有子资源准备就绪
 | `loadEvent`   | .loadEventEnd - .loadEventStart   | onload事件的执行耗时
-| `total`       | .loadEventEnd - .navigationStart  | 以上总耗时（因有重叠，非加总）
-| more          | @todo                             | 更多指标增加中，如资源加载总耗时
+| `loaded`      | .loadEventEnd - .navigationStart  | 页面加载完成总耗时
+| `FP`          | first-paint                       | 首次绘制
+| `FCP `        | first-contentful-paint            | 首次内容绘制
+| `DNS::[domain]`           | .domainLookupEnd - .domainLookupStart | 每个域名下最耗时的域名查询，如果cache，则无此项
+| `transmission::[domain]`  | .responseEnd - .requestStart | 每个域名下最耗时的网络传输，context会列明具体的url、是否压缩、传输大小
 
 
 ## 设计原理
@@ -125,8 +129,8 @@ Point = {
 
 内置有如下的group，注意不要覆盖：
 
-- `performance`: 对`window.performance.timing`的原始值统计
-- `audits`: 基于`window.performance.timing`的常见指标进行计算统计
+- `performance`: `window.performance.timing`原始值的统计
+- `audits`: 基于`window.performance`的进行关键性能指标计算后的统计
 - `default`: 对于匿名（未命名）打点的统计结果
 
 ## 说明文档
@@ -136,9 +140,9 @@ Point = {
 
 通过`timepot.config`设置全局默认配置：
 
-- `ENABLE_PERFORMANCE`：是否允许统计`performance.timing`数据，默认true
-- `ENABLE_SEND_BEACON`：是否启用`navigator.sendBeacon()`方法，默认true
-- `REPORT_DELAY_TIME`：上报的延时时间窗口，达到此阈值则上报，默认200ms
+- `enablePerformance`：是否允许统计`performance.timing`数据，默认true
+- `enableSendBeacon`：是否启用`navigator.sendBeacon()`方法，默认true
+- `reportDelayTime`：上报的延时时间窗口，达到此阈值则上报，默认200ms
 
 **内置分组**
 

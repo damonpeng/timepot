@@ -34,8 +34,6 @@
     }
     */
 
-   // @todo https://developers.google.com/web/updates/2018/07/reportingobserver
-
     /**
      * check if is array.
      * @param {Array} arrayLike 
@@ -88,12 +86,12 @@
      * Send data to server
      * @param {String}          url     Optional
      * @param {Object|String}   data    Optional
-     * @param {Object}          options Optional, options.ENABLE_SEND_BEACON indicate whether navigator.sendBeacon enabled.
+     * @param {Object}          options Optional, options.enableSendBeacon indicate whether navigator.sendBeacon enabled.
      */
     var sendBeacon = function(url, data, options) {
         var formattedData = data;
         
-        if (options.ENABLE_SEND_BEACON && 'sendBeacon' in navigator) {
+        if (options.enableSendBeacon && 'sendBeacon' in navigator) {
             if (data && typeof data !== 'string' && (typeof Blob === 'undefined' || data instanceof Blob===false)) {
                 // formattedData = new Blob([JSON.stringify(data)], {type: 'application/json'});
 
@@ -116,6 +114,7 @@
 
             return navigator.sendBeacon(url, formattedData);
         } else {
+            // @todo fallback to fetch
             // fallback to XHR
             var xhr;
             
@@ -173,10 +172,10 @@
 
     // global config
     timepot.config = {
-        NAMESPACE: 'timepot',   // global name space
-        ENABLE_PERFORMANCE: true,   //  if need performance data
-        ENABLE_SEND_BEACON: true,        // enable report data to server through navigator.sendBeacon
-        REPORT_DELAY_TIME: 200   // ms
+        namespace: 'timepot',   // global name space
+        enablePerformance: true,   //  if need performance data
+        enableSendBeacon: true,        // enable report data to server through navigator.sendBeacon
+        reportDelayTime: 200   // ms
         // QUEUE_DELAY_LENGTH : 5,
         // QUEUE_SEND_MAX_COUNT: 5,   // maxium send count
     };
@@ -222,22 +221,35 @@
         return new Promise(function(resolved, reject) {
             var isNeedWaiting = false;
 
-            if (timepot.config.ENABLE_PERFORMANCE) {
+            if (timepot.config.enablePerformance) {
                 // waiting for loading finished to get complete data
                 if (document.readyState === 'complete') {
                     timepot.performance();
                     timepot.audits();
                 } else {
                     isNeedWaiting = true;
-                    window.addEventListener('load', function() {
-                        // should async to wait for onload event executing
-                        setTimeout(function() {
+
+                    if (window.PerformanceObserver) {
+                        // a bit faster than load event plus setTimeout.
+                        (new PerformanceObserver(function(list, obj) {
                             timepot.performance();
                             timepot.audits();
 
                             resolved(gGroupTimepot);
-                        }, 0);
-                    });
+                        })).observe({
+                            entryTypes: ['navigation']
+                        });
+                    } else {
+                        window.addEventListener('load', function() {
+                            // should async to wait for onload event executing
+                            setTimeout(function() {
+                                timepot.performance();
+                                timepot.audits();
+
+                                resolved(gGroupTimepot);
+                            }, 0);
+                        });
+                    }
                 }
             }
 
@@ -246,7 +258,7 @@
     };
 
     /**
-     * Get performance data
+     * performance.timing raw data
      */
     timepot.performance = function() {
         var timing = getPerformanceTimingData();
@@ -259,6 +271,8 @@
         if (gGroupTimepot[timepot.GROUP_PERFORMANCE]) {
             return false;
         }
+        
+        // https://w3c.github.io/navigation-timing/#processing-model
         // keep order
         nodes = [
             'navigationStart',
@@ -292,6 +306,9 @@
         }
     };
 
+    /**
+     * audits for performance.timing
+     */
     var auditsPerformanceTiming = function() {
         var timing = getPerformanceTimingData(), group = timepot.GROUP_AUDITS;
 
@@ -299,9 +316,8 @@
             return false;
         }
 
+        // https://developers.google.com/web/fundamentals/performance/navigation-and-resource-timing
         if (! gGroupTimepot[group]) {
-            // https://w3c.github.io/navigation-timing/#processing-model
-
             // maybe 0
             timepot.mark('unload', {
                 group: group,
@@ -390,8 +406,7 @@
                 duration: timing.loadEventEnd - timing.loadEventStart
             });
 
-            // @todo name
-            timepot.mark('total', {
+            timepot.mark('loaded', {
                 group: group,
                 time: timing.loadEventEnd,
                 duration: timing.loadEventEnd - timing.navigationStart
@@ -401,9 +416,14 @@
         return true;
     };
 
+    /**
+     * audits for performance.getEntries()
+     */
     var auditsPerformanceEntries = function() {
         var group = timepot.GROUP_AUDITS,
-            entries = getPerformanceEntriesData();
+            entries = getPerformanceEntriesData(),
+            startTimestamp = getPerformanceAPI().timeOrigin,
+            domainData = {};
 
         if (! entries) {
             return false;
@@ -428,45 +448,9 @@
 
                 case 'resource':
                     var domain = entry.name.match(/:\/\/([^/]*)/)[1];
-                    // DNS time for different domains
-                    
-                    // transmission time for different domains
-                    // entry.responseEnd - entry.requestStart;
 
-                    // https://webplatform.github.io/docs/apis/resource_timing/PerformanceResourceTiming/initiatorType/
-                    /*
-                    - css: The initiator is any CSS resource downloaded via the url() syntax, such as @import url(), background: url(), etc.
-                    - embed: The initiator is the src attribute of the HTML <embed> element.
-                    - img: The initiator is the src attribute of the HTML <img> element.
-                    - link: The initiator is the href attribute of the HTML <link> element.
-                    - object: The initiator is the data attribute of the HTML <object> element.
-                    - script: The initiator is the src attribute of the HTML <script> element.
-                    - subdocument: The initiator is the src attribute of the HTML <frame> or HTML <iframe> elements.
-                    - svg: The initiator is the <svg> element and all resources downloaded as children of the <svg> element.
-                    - xmlhttprequest: The initiator is a XMLHttpRequest object.
-                    - other: The initiator is not of any type listed above.
-                    */
-                    switch (entry.initiatorType) {
-                        case 'img':
-                            // @size test
-                            // @time test
-                            break;
-
-                        case 'link':
-                            break;
-                            
-                        case 'script':
-                            // timepot.mark(, {
-
-                            // });
-                            break;
-                    }
-
-                    timepot.mark(domain, {
-                        group: group,
-                        time: entry.domainLookupEnd,
-                        duration: entry.domainLookupEnd - entry.domainLookupStart
-                    });
+                    !domainData[domain] && (domainData[domain] = []);
+                    domainData[domain].push(entry);
                     break;
 
                 case 'mark':
@@ -476,22 +460,110 @@
                     break;
 
                 case 'paint':
-                    timepot.mark(convertToCamelCase(entry.name), {
+                    timepot.mark({
+                        'first-paint': 'FP',
+                        'first-contentful-paint': 'FCP'
+                    }[entry.name], {
                         group: group,
-                        // @todo value fix
-                        time: entry.startTime,
-                        duration: entry.duration
+                        // convert DOMHighResTimeStamp to unix timestamp
+                        // https://developer.mozilla.org/en-US/docs/Web/API/DOMHighResTimeStamp#Value
+                        time: Math.round(startTimestamp + entry.startTime),
+                        // actually, this will always be zero.
+                        // https://www.w3.org/TR/paint-timing/#sec-PerformancePaintTiming
+                        duration: Math.round(entry.startTime)
                     });
                     break;
 
+                // @todo https://developer.mozilla.org/en-US/docs/Web/API/Long_Tasks_API
                 case 'longtask':
                     break;
             }
         }
 
-
+        analysisPerformanceEntriesByDomain(domainData);
 
         return true;
+    };
+
+    /**
+     * Analysis domain performance data
+     * @param {Object} domainData 
+     */
+    var analysisPerformanceEntriesByDomain = function(domainData) {
+        var pointMapping = {},
+            TYPE_DNS = 'DNS::',
+            TYPE_TRANSMISSION = 'transmission::',
+            startTimestamp = getPerformanceAPI().timeOrigin;
+
+        for(var domain in domainData) {
+            for(var i=0, l=domainData[domain].length; i<l; i++) {
+                var entry = domainData[domain][i];
+
+                !pointMapping[domain] && (
+                    pointMapping[domain] = {},
+                    pointMapping[domain][TYPE_DNS] = {
+                        duration: 0
+                    },
+                    pointMapping[domain][TYPE_TRANSMISSION] = {
+                        duration: 0
+                    }
+                );
+                
+                // https://webplatform.github.io/docs/apis/resource_timing/PerformanceResourceTiming/initiatorType/
+                /*
+                entry.initiatorType
+                - css: The initiator is any CSS resource downloaded via the url() syntax, such as @import url(), background: url(), etc.
+                - embed: The initiator is the src attribute of the HTML <embed> element.
+                - img: The initiator is the src attribute of the HTML <img> element.
+                - link: The initiator is the href attribute of the HTML <link> element.
+                - object: The initiator is the data attribute of the HTML <object> element.
+                - script: The initiator is the src attribute of the HTML <script> element.
+                - subdocument: The initiator is the src attribute of the HTML <frame> or HTML <iframe> elements.
+                - svg: The initiator is the <svg> element and all resources downloaded as children of the <svg> element.
+                - xmlhttprequest: The initiator is a XMLHttpRequest object.
+                - other: The initiator is not of any type listed above.
+                */
+
+                // max DNS lookup time cost of each domain
+                var durationDNS = entry.domainLookupEnd - entry.domainLookupStart;
+                if (durationDNS >0 && durationDNS > pointMapping[domain][TYPE_DNS].duration) {
+                    pointMapping[domain][TYPE_DNS] = {
+                        group: timepot.GROUP_AUDITS,
+                        time: Math.round(startTimestamp + entry.domainLookupEnd),
+                        duration: Math.round(durationDNS)
+                    };
+                }
+
+                // max transmission time cost of each domain
+                var durationTransmission = entry.responseEnd - entry.requestStart;
+                if (durationTransmission > pointMapping[domain][TYPE_TRANSMISSION].duration) {
+                    pointMapping[domain][TYPE_TRANSMISSION] = {
+                        group: timepot.GROUP_AUDITS,
+                        // convert DOMHighResTimeStamp to unix timestamp
+                        // https://developer.mozilla.org/en-US/docs/Web/API/DOMHighResTimeStamp#Value
+                        time: Math.round(startTimestamp + entry.responseEnd),
+                        duration: Math.round(durationTransmission),
+                        context: {
+                            url: entry.name,
+                            size: entry.transferSize,
+                            gzip: entry.transferSize > 0 ? (entry.decodedBodySize - entry.encodedBodySize > 0 ? true : false) : null
+                        }
+                    };
+                }
+
+            }
+        }
+
+        for (var domain in pointMapping) {
+            var pointDNS = pointMapping[domain][TYPE_DNS],
+                pointTransmission = pointMapping[domain][TYPE_TRANSMISSION];
+
+            // if cached, there is not dns lookup time cost.
+            pointDNS.duration && timepot.mark(TYPE_DNS + domain, pointDNS);
+            
+            timepot.mark(TYPE_TRANSMISSION + domain, pointTransmission);
+        }
+        
     };
 
     /**
@@ -499,7 +571,7 @@
      */
     timepot.audits = function() {
         auditsPerformanceTiming();
-        // auditsPerformanceEntries();
+        auditsPerformanceEntries();
     };
 
     /**
@@ -530,6 +602,12 @@
         }
     };
 
+    /**
+     * report timing data
+     * @param {String} url
+     * @param {Object} data
+     * @param {Object} options
+     */
     timepot.report = function(url, data, options) {
         var now = getCurrentMsTime(),
             delay,
@@ -539,7 +617,7 @@
 
         !options && (options = {});
 
-        delay = 'delay' in options ? options.delay : config.REPORT_DELAY_TIME;
+        delay = 'delay' in options ? options.delay : config.reportDelayTime;
 
         // 实时、延时触发一次上报
         if (
@@ -548,14 +626,13 @@
             deltaTime >= delay
         ) {
             // var data = timepot.splice(0, Math.min(length, config.QUEUE_SEND_MAX_COUNT));
-            // @todo 未来得及发送的，在beforeunload时触发
             // @todo data handler AOP
 
             clearTimeout(gTimerRunReport);
             gLastReportTime = now;
 
             sendBeacon(url, data, {
-                ENABLE_SEND_BEACON: config.ENABLE_SEND_BEACON
+                enableSendBeacon: config.enableSendBeacon
             });
         } else {
             clearTimeout(gTimerRunReport);
@@ -564,6 +641,20 @@
                 timepot.report(url, data, options);
             }, Math.max(0, delay - deltaTime));
         }
+
+        /*
+        // https://developers.google.com/web/fundamentals/performance/navigation-and-resource-timing
+        window.addEventListener("unload", function() {
+            // Caution: If you have a _lot_ of performance entries, don't send _everything_ via getEntries. This is just an example.
+            let rumData = new FormData();
+            rumData.append("entries", JSON.stringify(performance.getEntries()));
+
+            // Queue beacon request and inspect for failure
+            if(!navigator.sendBeacon("/phone-home", rumData)) {
+                // Recover here (XHR or fetch maybe)
+            }
+        }, false);
+        */
     };
 
     timepot.getMarkByName = function(name, group) {
@@ -634,6 +725,7 @@
         timepot = [];
         gGroupTimepot = {};
         gTimerRunReport = null;
+        gTickIndexMapping = {};
     };
 
     // entrace
