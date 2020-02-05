@@ -7,7 +7,7 @@ Time marker & report for page performance testing.
 
 ## 快速上手
 
-[示例代码](examples/demo.html)
+[示例代码](https://damonpeng.github.io/timepot/examples/demo.html)
 
 **1. 安装**
 
