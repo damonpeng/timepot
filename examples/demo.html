@@ -82,7 +82,14 @@
             timepot.console();
             // console.log('timing result', result);
             
-            timepot.report('?', result, {delay: 500});
+            timepot.report('?', result, {
+            // timepot.report('?', JSON.stringify(result), {
+            // timepot.report('?', new Blob([JSON.stringify(result)], {type: 'application/json'}), {
+            // timepot.report('?', new Blob([JSON.stringify(result)], {type: 'text/plain'}), {
+                enablePerformance: true,
+                enableSendBeacon: false,//true,
+                reportDelayTime: 500
+            });
 
             showResult(result);
         });

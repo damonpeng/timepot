@@ -89,12 +89,20 @@
      * @param {Object}          options Optional, options.enableSendBeacon indicate whether navigator.sendBeacon enabled.
      */
     var sendBeacon = function(url, data, options) {
-        var formattedData = data;
+        var formattedData = data,
+            contentType = 'text/plain';
+
+        if (typeof data === 'string') {
+            contentType = 'application/x-www-form-urlencoded';
+        } else if (typeof Blob !== 'undefined' && data instanceof Blob) {
+            contentType = data.type;
+        } else if (data && typeof data === 'object') {
+            contentType = 'application/json';
+            formattedData = JSON.stringify(data);
+        }
         
         if (options.enableSendBeacon && 'sendBeacon' in navigator) {
             if (data && typeof data !== 'string' && (typeof Blob === 'undefined' || data instanceof Blob===false)) {
-                // formattedData = new Blob([JSON.stringify(data)], {type: 'application/json'});
-
                 /* SHOULD NOT set Blob type to 'application/json', or error occurred:
                 Failed to execute 'sendBeacon' on 'Navigator': sendBeacon() 
                 with a Blob whose type is not any of the CORS-safelisted 
@@ -109,12 +117,25 @@
                     - text/plain
                 */
 
+                // formattedData = new Blob([JSON.stringify(data)], {type: 'application/json'});
                 formattedData = new Blob([JSON.stringify(data)], {type: 'application/x-www-form-urlencoded'});
             }
 
             return navigator.sendBeacon(url, formattedData);
+        } else if ('fetch' in window) {
+            // fallback to fetch
+            fetch(url, {
+                method: 'POST',
+                mode: 'cors',
+                credentials: 'include',
+                // https://developer.mozilla.org/en-US/docs/Web/API/Request/cache
+                cache: 'no-store',
+                headers: {
+                  'Content-Type': contentType
+                },
+                body: formattedData
+            });
         } else {
-            // @todo fallback to fetch
             // fallback to XHR
             var xhr;
             
@@ -122,13 +143,10 @@
             xhr.open('POST', url, true);
             xhr.withCredentials = true;
 
-            if (typeof data === 'string') {
-                xhr.setRequestHeader('Content-Type', 'text/plain; charset=utf-8');
-            } else if (typeof Blob !== 'undefined' && data instanceof Blob) {
+            if (typeof Blob !== 'undefined' && data instanceof Blob) {
                 data.type && xhr.setRequestHeader('Content-Type', data.type);
-            } else if (data && typeof data === 'object') {
-                xhr.setRequestHeader('Content-Type', 'application/json; charset=utf-8');
-                formattedData = JSON.stringify(data);
+            } else {
+                xhr.setRequestHeader('Content-Type', contentType + '; charset=utf-8');
             }
 
             try {
@@ -175,9 +193,8 @@
         namespace: 'timepot',   // global name space
         enablePerformance: true,   //  if need performance data
         enableSendBeacon: true,        // enable report data to server through navigator.sendBeacon
-        reportDelayTime: 200   // ms
-        // QUEUE_DELAY_LENGTH : 5,
-        // QUEUE_SEND_MAX_COUNT: 5,   // maxium send count
+        reportDelayTime: 200,   // ms
+        reportCountThreshold: 5
     };
 
     /**
@@ -366,7 +383,8 @@
                 duration: timing.responseStart - timing.requestStart
             });
 
-            timepot.mark('transmission', {
+            // name from https://stackoverflow.com/questions/1039513/what-is-a-request-response-pair-called/23887243#23887243
+            timepot.mark('exchange', {
                 group: group,
                 time: timing.responseEnd,
                 duration: timing.responseEnd - timing.requestStart
@@ -478,6 +496,13 @@
                 case 'longtask':
                     break;
             }
+
+            /* @todo 
+                - First Meaningful Paint
+                - Speed Index
+                - First CPU Idle
+                - Time to Interactive
+            */
         }
 
         analysisPerformanceEntriesByDomain(domainData);
@@ -492,7 +517,7 @@
     var analysisPerformanceEntriesByDomain = function(domainData) {
         var pointMapping = {},
             TYPE_DNS = 'DNS::',
-            TYPE_TRANSMISSION = 'transmission::',
+            TYPE_EXCHANGE = 'exchange::',
             startTimestamp = getPerformanceAPI().timeOrigin;
 
         for(var domain in domainData) {
@@ -504,7 +529,7 @@
                     pointMapping[domain][TYPE_DNS] = {
                         duration: 0
                     },
-                    pointMapping[domain][TYPE_TRANSMISSION] = {
+                    pointMapping[domain][TYPE_EXCHANGE] = {
                         duration: 0
                     }
                 );
@@ -534,15 +559,15 @@
                     };
                 }
 
-                // max transmission time cost of each domain
-                var durationTransmission = entry.responseEnd - entry.requestStart;
-                if (durationTransmission > pointMapping[domain][TYPE_TRANSMISSION].duration) {
-                    pointMapping[domain][TYPE_TRANSMISSION] = {
+                // max exchange time cost of each domain
+                var durationExchange = entry.responseEnd - entry.requestStart;
+                if (durationExchange > pointMapping[domain][TYPE_EXCHANGE].duration) {
+                    pointMapping[domain][TYPE_EXCHANGE] = {
                         group: timepot.GROUP_AUDITS,
                         // convert DOMHighResTimeStamp to unix timestamp
                         // https://developer.mozilla.org/en-US/docs/Web/API/DOMHighResTimeStamp#Value
                         time: Math.round(startTimestamp + entry.responseEnd),
-                        duration: Math.round(durationTransmission),
+                        duration: Math.round(durationExchange),
                         context: {
                             url: entry.name,
                             size: entry.transferSize,
@@ -556,12 +581,12 @@
 
         for (var domain in pointMapping) {
             var pointDNS = pointMapping[domain][TYPE_DNS],
-                pointTransmission = pointMapping[domain][TYPE_TRANSMISSION];
+                pointExchange = pointMapping[domain][TYPE_EXCHANGE];
 
             // if cached, there is not dns lookup time cost.
             pointDNS.duration && timepot.mark(TYPE_DNS + domain, pointDNS);
             
-            timepot.mark(TYPE_TRANSMISSION + domain, pointTransmission);
+            timepot.mark(TYPE_EXCHANGE + domain, pointExchange);
         }
         
     };
@@ -610,36 +635,37 @@
      */
     timepot.report = function(url, data, options) {
         var now = getCurrentMsTime(),
-            delay,
+            reportDelayTime,
             config = timepot.config,
-            // length = timepot.length,
+            length = timepot.length,
             deltaTime = now - gLastReportTime;
 
         !options && (options = {});
 
-        delay = 'delay' in options ? options.delay : config.reportDelayTime;
+        reportDelayTime = 'reportDelayTime' in options ? options.reportDelayTime : config.reportDelayTime;
+        reportCountThreshold = 'reportCountThreshold' in options ? options.reportCountThreshold : config.reportCountThreshold;
 
         // 实时、延时触发一次上报
         if (
-            // delay === 0 ||
-            // length >= config.QUEUE_DELAY_LENGTH ||
-            deltaTime >= delay
+            // reportDelayTime === 0 ||
+            // length >= reportCountThreshold ||
+            deltaTime >= reportDelayTime
         ) {
-            // var data = timepot.splice(0, Math.min(length, config.QUEUE_SEND_MAX_COUNT));
+            // var data = timepot.splice(0, Math.min(length, reportCountThreshold));
             // @todo data handler AOP
 
             clearTimeout(gTimerRunReport);
             gLastReportTime = now;
 
             sendBeacon(url, data, {
-                enableSendBeacon: config.enableSendBeacon
+                enableSendBeacon: 'enableSendBeacon' in options ? options.enableSendBeacon : config.enableSendBeacon
             });
         } else {
             clearTimeout(gTimerRunReport);
 
             gTimerRunReport = setTimeout(() => {
                 timepot.report(url, data, options);
-            }, Math.max(0, delay - deltaTime));
+            }, Math.max(0, reportDelayTime - deltaTime));
         }
 
         /*
@@ -655,30 +681,6 @@
             }
         }, false);
         */
-    };
-
-    timepot.getMarkByName = function(name, group) {
-
-    };
-
-    timepot.measure = function(name, startMark, endMark, group) {
-        var result;
-
-        if (typeof startMark === 'string') {
-            result = timepot.getMarkByName(endMark, group).time - timepot.getMarkByName(startMark, group).time
-        } else {
-            result = endMark.time - startMark.time;
-        }
-
-        return result;
-    };
-
-    timepot.save = function(storage) {
-        
-    };
-
-    timepot.restore = function(storage) {
-        
     };
 
     /**

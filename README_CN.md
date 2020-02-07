@@ -3,6 +3,8 @@ Time marker & report for page performance testing.
 
 用于 Web 页面性能测速的打点统计及上报。
 
+[![License](https://img.shields.io/npm/l/timepot)](https://github.com/damonpeng/timepot/blob/master/LICENSE) [![Build Status](https://travis-ci.org/damonpeng/timepot.svg?branch=master)](https://travis-ci.org/damonpeng/timepot) [![Npm Version](https://img.shields.io/npm/v/timepot)](https://www.npmjs.com/package/timepot)
+
 [English Version](README.md)(@todo) | [中文版](README_CN.md)
 
 ## 快速上手
@@ -98,7 +100,7 @@ timepot.mark('end', { group: 'page' });
 | `connect` | .connectEnd - .connectStart           | TCP建立连接耗时
 | `SSL`     | .connectEnd - .secureConnectionStart  | 非https请求则无此项
 | `TTFB`    | .responseStart - .requestStart        | 浏览器[从发起请求到收到第一个字节的回包响应](https://en.wikipedia.org/wiki/Time_to_first_byte)
-| `transmission`| .responseEnd - .requestStart      | 网络传输耗时，从发起请求，到收到所有回包内容
+| `exchange`| .responseEnd - .requestStart      | 网络传输耗时，从发起请求，到收到所有回包内容
 | `DOMParse`| .domInteractive - .domLoading         | DOM解析时间
 | `DOMContentLoaded`| .domContentLoadedEventStart - .domLoading | [DOM 和 CSSOM](https://calendar.perfplanet.com/2012/deciphering-the-critical-rendering-path/)均准备就绪
 | `DOMContentLoadedEvent`| .domContentLoadedEventEnd - .domContentLoadedEventStart | [DOMContentLoaded事件](https://developer.mozilla.org/en-US/docs/Web/API/Document/DOMContentLoaded_event)的执行耗时
@@ -107,8 +109,8 @@ timepot.mark('end', { group: 'page' });
 | `loaded`      | .loadEventEnd - .navigationStart  | 页面加载完成总耗时
 | `FP`          | first-paint                       | 首次绘制
 | `FCP `        | first-contentful-paint            | 首次内容绘制
-| `DNS::[domain]`           | .domainLookupEnd - .domainLookupStart | 每个域名下最耗时的域名查询，如果cache，则无此项
-| `transmission::[domain]`  | .responseEnd - .requestStart | 每个域名下最耗时的网络传输，context会列明具体的url、是否压缩、传输大小
+| `DNS::[domain]`       | .domainLookupEnd - .domainLookupStart | 每个域名下最耗时的域名查询，如果cache，则无此项
+| `exchange::[domain]`  | .responseEnd - .requestStart | 每个域名下最耗时的网络传输，context会列明具体的url、是否压缩、传输大小
 
 
 ## 设计原理
@@ -182,13 +184,11 @@ Point = {
 
 ## todo
 
-- 不同域名的dns时间
-- 不同域名的ttfb差异
 - 超过throttle size 的 图片
-- 超过throttle time 的 transmission
+- 超过throttle time 的 exchange
 
 ## License
 
 MIT
 
-欢迎 Issue.
+欢迎 Issue. If you have any questions that aren't covered here please let me know.
