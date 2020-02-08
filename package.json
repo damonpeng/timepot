@@ -1,7 +1,7 @@
 
 {
   "name": "timepot",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Time marker & report for page performance testing.",
   "main": "timepot.js",
   "scripts": {
