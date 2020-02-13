@@ -9,7 +9,11 @@
         gGroupTimepot = {},
         gTimerRunReport = null,
         gLastReportTime,
-        gTickIndexMapping = {};
+        gIsStopReport = false,
+        gIsUnloadReportBind = false,
+        gTickIndexMapping = {},
+        REPORT_FROM_UNLOAD = 'unload',
+        REPORT_FROM_POLLING = 'polling';
 
     if (window.timepot) {
         timepot = window.timepot;
@@ -30,17 +34,46 @@
         name: '',
         time: 0,
         duration: 0,  // dynamic calculate
-        context: {}
+        context: {},
+        reported: Boolean
     }
     */
 
     /**
-     * check if is array.
+     * Check if is array.
      * @param {Array} arrayLike 
      */
     var isArray = function(arrayLike) {
         return Object.prototype.toString.call(arrayLike) === '[object Array]';
     };
+
+    /**
+     * Check if input empty. from https://stackoverflow.com/a/4994244/12849462
+     * @param {Object} obj 
+     */
+    var isEmpty = function (obj) {
+        // null and undefined are "empty"
+        if (obj == null) return true;
+
+        // Assume if it has a length property with a non-zero value
+        // that that property is correct.
+        if (obj.length > 0)    return false;
+        if (obj.length === 0)  return true;
+
+        // If it isn't an object at this point
+        // it is empty, but it can't be anything *but* empty
+        // Is it empty?  Depends on your application.
+        if (typeof obj !== "object") return true;
+
+        // Otherwise, does it have any properties of its own?
+        // Note that this doesn't handle
+        // toString and valueOf enumeration bugs in IE < 9
+        for (var key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) return false;
+        }
+
+        return true;
+    }
 
     /**
      * Convert to camel case variable
@@ -86,7 +119,9 @@
      * Send data to server
      * @param {String}          url     Optional
      * @param {Object|String}   data    Optional
-     * @param {Object}          options Optional, options.enableSendBeacon indicate whether navigator.sendBeacon enabled.
+     * @param {Object}          options Optional, 
+     *                                  options.enableSendBeacon indicate whether navigator.sendBeacon enabled.
+     *                                  options.enableFetch indicate whether fetch enabled.
      */
     var sendBeacon = function(url, data, options) {
         var formattedData = data,
@@ -101,7 +136,7 @@
             formattedData = JSON.stringify(data);
         }
         
-        if (options.enableSendBeacon && 'sendBeacon' in navigator) {
+        if (options.enableSendBeacon && ('sendBeacon' in navigator)) {
             if (data && typeof data !== 'string' && (typeof Blob === 'undefined' || data instanceof Blob===false)) {
                 /* SHOULD NOT set Blob type to 'application/json', or error occurred:
                 Failed to execute 'sendBeacon' on 'Navigator': sendBeacon() 
@@ -122,14 +157,35 @@
             }
 
             return navigator.sendBeacon(url, formattedData);
-        } else if ('fetch' in window) {
+        } else if (options.enableFetch && ('fetch' in window)) {
+            /*
+            var isSameOrigin = true,
+                originMatches;
+
+            originMatches = url.match(/^(https?:)?\/\/([^/]*)/);
+
+            if (originMatches && originMatches.length > 2) {
+                var isSameProtocol, isSameHost;
+
+                isSameProtocol = !originMatches[1] || originMatches[1] === location.protocol ? true : false;
+                isSameHost = originMatches[2] && originMatches[2] === location.host ? true : false; 
+
+                isSameOrigin = isSameProtocol && isSameHost ? true : false;
+            }
+            */
+
             // fallback to fetch
             fetch(url, {
                 method: 'POST',
-                mode: 'cors',
+                mode: 'no-cors',
                 credentials: 'include',
                 // https://developer.mozilla.org/en-US/docs/Web/API/Request/cache
                 cache: 'no-store',
+                // https://fetch.spec.whatwg.org/#requests
+                // This can be used to allow the request to outlive the environment settings object,
+                //  e.g., navigator.sendBeacon and the HTML img element set this flag. 
+                // Requests with this flag set are subject to additional processing requirements.
+                keepalive: true,
                 headers: {
                   'Content-Type': contentType
                 },
@@ -190,11 +246,11 @@
 
     // global config
     timepot.config = {
-        namespace: 'timepot',   // global name space
-        enablePerformance: true,   //  if need performance data
-        enableSendBeacon: true,        // enable report data to server through navigator.sendBeacon
-        reportDelayTime: 200,   // ms
-        reportCountThreshold: 5
+        // namespace: 'timepot',   // global name space
+        enablePerformance: true,    //  if need performance data
+        enableSendBeacon: true,     // enable report data to server through navigator.sendBeacon
+        enableFetch: true,          // enable report data to server through fetch
+        reportPollingTime: 1000     // ms
     };
 
     /**
@@ -231,51 +287,29 @@
     };
 
     /**
-     * calculated timing data, Promised api
+     * Start
      */
-    timepot.timing = function() {
-        // @todo polyfill Promise
-        return new Promise(function(resolved, reject) {
-            var isNeedWaiting = false;
-
-            if (timepot.config.enablePerformance) {
-                // waiting for loading finished to get complete data
-                if (document.readyState === 'complete') {
-                    timepot.performance();
-                    timepot.audits();
-                } else {
-                    isNeedWaiting = true;
-
-                    if (window.PerformanceObserver) {
-                        // a bit faster than load event plus setTimeout.
-                        (new PerformanceObserver(function(list, obj) {
-                            timepot.performance();
-                            timepot.audits();
-
-                            resolved(gGroupTimepot);
-                        })).observe({
-                            entryTypes: ['navigation']
-                        });
-                    } else {
-                        window.addEventListener('load', function() {
-                            // should async to wait for onload event executing
-                            setTimeout(function() {
-                                timepot.performance();
-                                timepot.audits();
-
-                                resolved(gGroupTimepot);
-                            }, 0);
-                        });
-                    }
-                }
-            }
-
-            !isNeedWaiting && resolved(gGroupTimepot);
-        });
+    timepot.start = function(group) {
+        timepot.mark('start', { group: group });
     };
 
     /**
-     * performance.timing raw data
+     * Tick
+     */
+    timepot.tick = function(group) {
+        !(group in gTickIndexMapping) && (gTickIndexMapping[group] = -1);
+        timepot.mark('tick' + (++gTickIndexMapping[group]), { group: group });
+    };
+
+    /**
+     * Stop
+     */
+    timepot.stop = function(group) {
+        timepot.mark('stop', { group: group} );
+    };
+
+    /**
+     * Performance.timing raw data
      */
     timepot.performance = function() {
         var timing = getPerformanceTimingData();
@@ -324,7 +358,7 @@
     };
 
     /**
-     * audits for performance.timing
+     * Audits for performance.timing
      */
     var auditsPerformanceTiming = function() {
         var timing = getPerformanceTimingData(), group = timepot.GROUP_AUDITS;
@@ -435,7 +469,7 @@
     };
 
     /**
-     * audits for performance.getEntries()
+     * Audits for performance.getEntries()
      */
     var auditsPerformanceEntries = function() {
         var group = timepot.GROUP_AUDITS,
@@ -592,7 +626,7 @@
     };
 
     /**
-     * performance audits
+     * Performance audits
      */
     timepot.audits = function() {
         auditsPerformanceTiming();
@@ -600,22 +634,201 @@
     };
 
     /**
+     * Get pure timing data
+     */
+    timepot.getRawTimingData = function() {
+        var data = [];
+
+        for (var i=0, l=timepot.length; i<l; i++) {
+            data.push( timepot[i] );
+        }
+
+        return data;
+    };
+
+    /**
      * Get timing data by group
      */
-    timepot.getGroup = function(group) {
+    timepot.getTimingGroup = function(group) {
         return gGroupTimepot[group] || {};
     };
 
-    timepot.getDefault = function() {
-        return timepot.getGroup(timepot.GROUP_DEFAULT);
+    /**
+     * Get performance group data
+     */
+    timepot.getPerformance = function () {
+        return timepot.getTimingGroup(timepot.GROUP_PERFORMANCE);
     };
 
-    timepot.getPerfomance = function () {
-        return timepot.getGroup(timepot.GROUP_PERFORMANCE);
-    };
-
+    /**
+     * Get audits group data
+     */
     timepot.getAudits = function() {
-        return timepot.getGroup(timepot.GROUP_AUDITS);
+        return timepot.getTimingGroup(timepot.GROUP_AUDITS);
+    };
+
+    /**
+     * Calculated timing data, Promised api
+     */
+    timepot.timing = function() {
+        // @todo polyfill Promise
+        return new Promise(function(resolved, reject) {
+            var isNeedWaiting = false;
+
+            if (timepot.config.enablePerformance) {
+                // waiting for loading finished to get complete data
+                if (document.readyState === 'complete') {
+                    timepot.performance();
+                    timepot.audits();
+                } else {
+                    isNeedWaiting = true;
+
+                    if (window.PerformanceObserver) {
+                        // a bit faster than load event plus setTimeout.
+                        (new PerformanceObserver(function(list, obj) {
+                            timepot.performance();
+                            timepot.audits();
+
+                            resolved(timepot.getRawTimingData());
+                        })).observe({
+                            entryTypes: ['navigation']
+                        });
+                    } else {
+                        window.addEventListener('load', function() {
+                            // should async to wait for onload event executing
+                            setTimeout(function() {
+                                timepot.performance();
+                                timepot.audits();
+
+                                resolved(timepot.getRawTimingData());
+                            }, 0);
+                        });
+                    }
+                }
+            }
+
+            !isNeedWaiting && (
+                resolved(timepot.getRawTimingData())
+            );
+        });
+    };
+
+    /**
+     * Formatting timing data
+     */
+    timepot.formatTimingDataByGroup = function(data) {
+        var mapping = {};
+
+        for (var i=0, l=data.length; i<l; i++) {
+            !mapping[data[i].group] && (mapping[data[i].group] = []);
+            mapping[data[i].group].push( data[i] );
+        }
+
+        return mapping;
+    };
+
+    /**
+     * Report data to server
+     * @param {String} url Required, remote server url
+     * @param {function} dataHandler Optional, data format handler
+     * @param {Object} options  options.reportPollingTime: polling to report
+     *                          options.inRealtime: if need sent data in realtime
+     *                          options.enableSendBeacon: if enable navigator.sendBeacon()
+     *                          options.enableFetch: if enable fetch()
+     *                          options.from: for identify if internal call
+     * 
+     */
+    timepot.report = function(url, dataHandler, options) {
+        var now = getCurrentMsTime(),
+            reportPollingTime,
+            config = timepot.config,
+            deltaTime = now - gLastReportTime;
+
+        !options && (options = {});
+        !dataHandler && (dataHandler = function(data) { return data; });
+
+        if (options.from && options.from!==REPORT_FROM_POLLING && options.from!==REPORT_FROM_UNLOAD) {
+            gIsStopReport = false;
+        }
+
+        if (gIsStopReport) {
+            return;
+        }
+
+        reportPollingTime = 'reportPollingTime' in options ? options.reportPollingTime : config.reportPollingTime;
+
+        // report in real time, or meet polling waiting time
+        if (
+            options.inRealtime
+            ||
+            deltaTime >= reportPollingTime
+        ) {
+            var reportData,
+                unreportData = [];
+
+            gLastReportTime = now;
+
+            // get only unreported data
+            for (var i=0, l=timepot.length; i<l; i++) {
+                !timepot[i].reported && (
+                    unreportData.push(timepot[i])
+                );
+            }
+
+            reportData = dataHandler(unreportData);
+
+            if (! isEmpty(reportData)) {
+                sendBeacon(url, reportData, {
+                    enableSendBeacon: 'enableSendBeacon' in options ? options.enableSendBeacon : config.enableSendBeacon,
+                    enableFetch: 'enableFetch' in options ? options.enableFetch : config.enableFetch
+                });
+            }
+
+            // set data as reported
+            for (var i=0, l=unreportData.length; i<l; i++) {
+                unreportData[i].reported = true;
+            }
+
+            // continue polling
+            options.from!==REPORT_FROM_UNLOAD && timepot.report(url, dataHandler, options);
+        } else {
+            clearTimeout(gTimerRunReport);
+
+            gTimerRunReport = setTimeout(() => {
+                options.from = 'polling';
+                timepot.report(url, dataHandler, options);
+            }, Math.max(0, reportPollingTime - deltaTime));
+        }
+
+        if (! gIsUnloadReportBind) {
+            gIsUnloadReportBind = true;
+        
+            // https://developers.google.com/web/fundamentals/performance/navigation-and-resource-timing
+            window.addEventListener('beforeunload', function() {
+                console.log(11);
+                options.from = 'unload';
+                options.inRealtime = true;
+                timepot.report(url, dataHandler, options);
+            }, false);
+        }
+    };
+    
+    /**
+     * Stop report polling
+     */
+    timepot.stopReport = function() {
+        clearTimeout(gTimerRunReport);
+        gIsStopReport = true;
+    };
+
+    /**
+     * Clear timepot data
+     */
+    timepot.clear = function() {
+        timepot = [];
+        gGroupTimepot = {};
+        gTimerRunReport = null;
+        gTickIndexMapping = {};
     };
 
     /**
@@ -625,109 +838,6 @@
         for (var group in gGroupTimepot) {
             console.table(gGroupTimepot[group], ['group', 'name', 'time', 'duration']);
         }
-    };
-
-    /**
-     * report timing data
-     * @param {String} url
-     * @param {Object} data
-     * @param {Object} options
-     */
-    timepot.report = function(url, data, options) {
-        var now = getCurrentMsTime(),
-            reportDelayTime,
-            config = timepot.config,
-            length = timepot.length,
-            deltaTime = now - gLastReportTime;
-
-        !options && (options = {});
-
-        reportDelayTime = 'reportDelayTime' in options ? options.reportDelayTime : config.reportDelayTime;
-        reportCountThreshold = 'reportCountThreshold' in options ? options.reportCountThreshold : config.reportCountThreshold;
-
-        // 实时、延时触发一次上报
-        if (
-            // reportDelayTime === 0 ||
-            // length >= reportCountThreshold ||
-            deltaTime >= reportDelayTime
-        ) {
-            // var data = timepot.splice(0, Math.min(length, reportCountThreshold));
-            // @todo data handler AOP
-
-            clearTimeout(gTimerRunReport);
-            gLastReportTime = now;
-
-            sendBeacon(url, data, {
-                enableSendBeacon: 'enableSendBeacon' in options ? options.enableSendBeacon : config.enableSendBeacon
-            });
-        } else {
-            clearTimeout(gTimerRunReport);
-
-            gTimerRunReport = setTimeout(() => {
-                timepot.report(url, data, options);
-            }, Math.max(0, reportDelayTime - deltaTime));
-        }
-
-        /*
-        // https://developers.google.com/web/fundamentals/performance/navigation-and-resource-timing
-        window.addEventListener("unload", function() {
-            // Caution: If you have a _lot_ of performance entries, don't send _everything_ via getEntries. This is just an example.
-            let rumData = new FormData();
-            rumData.append("entries", JSON.stringify(performance.getEntries()));
-
-            // Queue beacon request and inspect for failure
-            if(!navigator.sendBeacon("/phone-home", rumData)) {
-                // Recover here (XHR or fetch maybe)
-            }
-        }, false);
-        */
-    };
-
-    /**
-     * start
-     */
-    timepot.start = function(group) {
-        timepot.mark('start', { group: group });
-    };
-
-    /**
-     * tick
-     */
-    timepot.tick = function(group) {
-        !(group in gTickIndexMapping) && (gTickIndexMapping[group] = -1);
-        timepot.mark('tick' + (++gTickIndexMapping[group]), { group: group });
-    };
-
-    /**
-     * stop
-     */
-    timepot.stop = function(group) {
-        timepot.mark('stop', { group: group} );
-    };
-
-    /**
-     * Load time marker data before timepot initialized.
-     * @todo not supported
-     */
-    /*
-    timepot.load = function(data) {
-        if (isArray(data)) {
-            for(var i=data.length; i>=0; i--) {
-                timepot.mark(data[i].name||'', data[i]);  // @todo unshift
-                // timepot.unshift(data[i]);
-            }
-        }
-    };
-    */
-
-    /**
-     * clear timepot data
-     */
-    timepot.clear = function() {
-        timepot = [];
-        gGroupTimepot = {};
-        gTimerRunReport = null;
-        gTickIndexMapping = {};
     };
 
     // entrace

@@ -80,18 +80,22 @@
         // result
         timepot.timing().then(result => {
             timepot.console();
-            // console.log('timing result', result);
+            console.log('timing result', result);
             
-            timepot.report('?', result, {
             // timepot.report('?', JSON.stringify(result), {
             // timepot.report('?', new Blob([JSON.stringify(result)], {type: 'application/json'}), {
             // timepot.report('?', new Blob([JSON.stringify(result)], {type: 'text/plain'}), {
-                enablePerformance: true,
+            // timepot.report('//example.com//?', timingData => {
+            timepot.report('?', timingData => {
+                return timingData;
+            }, {
                 enableSendBeacon: false,//true,
-                reportDelayTime: 500
+                reportPollingTime: 500
             });
 
-            showResult(result);
+            showResult(
+                timepot.formatTimingDataByGroup(result)
+            );
         });
         
         // show result in page
