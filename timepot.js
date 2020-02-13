@@ -805,7 +805,6 @@
         
             // https://developers.google.com/web/fundamentals/performance/navigation-and-resource-timing
             window.addEventListener('beforeunload', function() {
-                console.log(11);
                 options.from = 'unload';
                 options.inRealtime = true;
                 timepot.report(url, dataHandler, options);
