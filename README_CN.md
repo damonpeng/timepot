@@ -1,4 +1,7 @@
 # Timepot
+
+<img src="./logo.png" width="128">
+
 Time marker & report for page performance testing.
 
 用于 Web 页面性能测速的打点统计及上报。
