@@ -19,7 +19,7 @@ Time marker & report for page performance testing.
 
 **1. 安装**
 
-```
+```bash
 npm install timepot --save
 ```
 
@@ -27,7 +27,7 @@ npm install timepot --save
 
 引入`timepot`后，即可随时打点；在需要时输出或上报。
 
-```
+```javascript
 timepot.mark();  // anonymous mark
 /* SOME CODE HERE */
 timepot.mark('rendered');  // named mark
@@ -71,7 +71,7 @@ timepot.timing().then(function(result) {
 **数据结构**
 每个打点数据包装为一个`Point`，结构为：
 
-```
+```javascript
 Point = {
     group: '',      // optional, group name
     name: '',       // optional, name of this point
@@ -159,7 +159,7 @@ Point = {
 
 在文档开始处（如<head>)预埋小段代码，加载`timepot`后，对应的数据不会丢失；在完成`timepot`加载前，仅支持`timepot.mark()`方法。
 
-```
+```javascript
 <script type="text/javascript">
     window.timepot = window.timepot || [];
     timepot.mark = timepot.mark || function(name, point) {
@@ -175,7 +175,7 @@ Point = {
 
 需要对每个实例进行命名，以group区分。
 
-```
+```javascript
 timepot.mark('start', { group: 'page' });
 /* SOME CODE HERE */
 timepot.mark('end', { group: 'page' });
