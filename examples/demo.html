@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="format-detection" content="email=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>timepot demo</title>
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <script type="text/javascript">
+        window.timepot = window.timepot || [];
+        timepot.mark = timepot.mark || function(name, point) {
+            !point && (point = {});
+            name && (point.name = name);
+            point.time = Date.now();
+            timepot.push(point);
+        };
+    </script>
+    <script type="text/javascript">
+        // statistics before timepot loaded
+        timepot.mark('t0');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.mark('t1');
+        timepot.mark();
+    </script>
+    <link href="https://www.gstatic.com/images/icons/material/anim/mspin/mspin_googblue_medium.css" rel="stylesheet" type="text/css" />
+    <!-- <link href="https://images-na.ssl-images-amazon.com/images/I/41VXYQh+WJL.css?AUIClients/AmazonGatewayAuiAssets" rel="stylesheet" type="text/css" /> -->
+    <style type="text/css">
+    table {width: 100%;border-collapse: collapse;margin-bottom: 20px;}
+    caption {font-weight: 700; font-size: 120%;}
+    td,th {border: 1px solid #ddd;padding: 5px 10px;}
+    th {background-color: #44B549;}
+    td.name{text-align: left;width:50%;}
+    td.time{text-align: right;width:30%;font-family:consolas,verdana}
+    td.duration{text-align: right;font-family:consolas,verdana}
+    </style>
+    <script type="text/javascript" src="https://www.apple.com/metrics/data-relay/1.1.4/scripts/auto-relay.js"></script>
+    <script type="text/javascript" src="https://m.qq.com/javascripts/lib/jquery.js"></script>
+    <script type="text/javascript" src="../timepot.js"></script>
+</head>
+<body>
+    <div style="margin: 20px auto; text-align: center;">
+        <img src="../logo.png" width="48" />
+        <div>Timing result beblow, or press `F12` and refresh to see the result in console.</div>
+        <div><a href="https://github.com/damonpeng/timepot"> &lt; Back to Timepot</a></div>
+        <div style="margin:20px auto 50px">
+            <span style="margin:10px"><img height="30" width="36" src="https://www.apple.com/ac/globalnav/5/en_US/images/globalnav/apple/image_small.svg" style="background:#000" /></span>
+            <span style="margin:10px"><img height="24" src="https://www.gstatic.com/images/branding/googlelogo/svg/googlelogo_clr_74x24px.svg" alt="Google" /></span>
+            <!-- <span style="margin:10px"><img height="24" src="https://images-na.ssl-images-amazon.com/images/G/01/SellerForums/amz/amazon-seller-forums-logo-small-1._CB488193639_.png" alt="Amazon" /></span> -->
+            <span style="margin:10px"><img height="24" src="https://www.tencent.com/img/index/menu_logo_hover.png" alt="Tencent" /></span>
+        </div>
+        <h3>Result of timing</h3>
+        <hr />
+        <div id="result"></div>
+    </div>
+    <script type="text/javascript">
+        // mark mode
+        timepot.mark('logicStart', { group: 'page' });
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.mark('logicEnd', { group: 'page' });
+
+        // stopwatch mode
+        timepot.start('stopwatch');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.tick('stopwatch');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.tick('stopwatch');
+        for (var i=0; i<Math.random()*1e12; i++) {
+        }
+        timepot.stop('stopwatch');
+
+        // result
+        timepot.timing().then(result => {
+            timepot.console();
+            console.log('timing result', result);
+            
+            // timepot.report('?', JSON.stringify(result), {
+            // timepot.report('?', new Blob([JSON.stringify(result)], {type: 'application/json'}), {
+            // timepot.report('?', new Blob([JSON.stringify(result)], {type: 'text/plain'}), {
+            // timepot.report('//example.com//?', timingData => {
+            timepot.report('?', timingData => {
+                return timingData;
+            }, {
+                enableSendBeacon: false,//true,
+                reportPollingTime: 500
+            });
+
+            showResult(
+                timepot.formatTimingDataByGroup(result)
+            );
+        });
+        
+        // show result in page
+        function showResult(data) {
+            var content = [];
+
+            for (var group in data) {
+                var rows = [];
+                
+                data[group].forEach(item => {
+                    rows.push(`<tr>
+                        <td class="name">${item.name}</td>
+                        <td class="time">${item.time}</td>
+                        <td class="duration">${item.duration}</td>
+                    </tr>`);
+                });
+                content.push(`<table>
+                    <caption>${group}</caption>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Time</th>
+                            <th>Duration(ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.join('\n')}
+                    </tbody>
+                </table>`);
+            }
+            $(content.join('\n')).appendTo('#result');
+        }
+    </script>
+</body>
+</html>

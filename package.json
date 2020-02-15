@@ -1,0 +1,22 @@
+{
+  "name": "timepot",
+  "version": "1.1.2",
+  "description": "Time marker & report for page performance testing.",
+  "main": "timepot.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:damonpeng/timepot.git"
+  },
+  "author": "damo",
+  "keywords": [
+    "timepot",
+    "performance"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
