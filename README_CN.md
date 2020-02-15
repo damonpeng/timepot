@@ -2,11 +2,14 @@
 
 <img src="./logo.png" width="128">
 
+[![Npm Version](https://img.shields.io/npm/v/timepot?style=flat-square)](https://www.npmjs.com/package/timepot)
+[![Build Status](https://travis-ci.org/damonpeng/timepot.svg?branch=master&style=flat-square)](https://travis-ci.org/damonpeng/timepot)
+[![Dependencies](https://img.shields.io/librariesio/dependents/npm/timepot?style=flat-square)](https://libraries.io/npm/timepot)
+[![License](https://img.shields.io/npm/l/timepot?style=flat-square)](https://github.com/damonpeng/timepot/blob/master/LICENSE)
+
 Time marker & report for page performance testing.
 
 用于 Web 页面性能测速的打点统计及上报。
-
-[![License](https://img.shields.io/npm/l/timepot)](https://github.com/damonpeng/timepot/blob/master/LICENSE) [![Build Status](https://travis-ci.org/damonpeng/timepot.svg?branch=master)](https://travis-ci.org/damonpeng/timepot) [![Npm Version](https://img.shields.io/npm/v/timepot)](https://www.npmjs.com/package/timepot)
 
 [English Version](README.md)(@todo) | [中文版](README_CN.md)
 
@@ -41,7 +44,7 @@ timepot.timing().then(function(result) {
 });
 ```
 
-**更简单的秒表模式**
+**简化的秒表模式**
 
 秒表模式：参数简化版，仅关注本次计时的 group 名称，不关心每个打点的命名，自动采用 `tick + index` 递增命名。
 
@@ -113,7 +116,7 @@ Point = {
 | `exchange::[domain]`  | .responseEnd - .requestStart | 每个域名下最耗时的网络传输，context会列明具体的url、是否压缩、传输大小
 
 
-## 说明文档
+## API
 
 **配置参数**
 
@@ -133,15 +136,15 @@ Point = {
 | `timepot.tick(group)`       | 计时器，打下一个计时点    | `group`：required，String，值同start
 | `timepot.stop(group)`       | 计时器，结束            | `group`：required，String，值同start
 | `timepot.timing()`          | 统计耗时，Promise 接口  | -
+| `timepot.report(url, dataHandler, options)` | 上报数据           | `url`：上报的服务端地址；`dataHandler `：上报的数据的处理函数，需要return有效上报值；`options`：选项，见下文
+| `timepot.stopReport()`      | 停止上报        | -
 | `timepot.getRawTimingData()`    | 获取原始测速数据    | -
 | `timepot.getTimingGroup(group)` | 按分组获取测速数据   | `group`：required，String，分组名称
 | `timepot.getPerformance()`   | 获取performance性能测速数据 | -
 | `timepot.getAudits()`       | 获取常见性能指标数据         | -
-| `timepot.console()`         | 以表格形式在控制台打印测速数据 | -
-| `timepot.clear()`           | 清除所有测速数据             | -
 | `timepot.formatTimingDataByGroup(data)`     | 按group格式化原始测速数据 | `data`：required，Array，待格式化的原始测速数据
-| `timepot.report(url, dataHandler, options)` | 上报数据           | `url`：上报的服务端地址；`dataHandler `：上报的数据的处理函数，需要return有效上报值；`options`：选项，见下文
-| `timepot.stopReport()`      | 停止上报        | -
+| `timepot.clear()`           | 清除所有测速数据             | -
+| `timepot.console()`         | 以表格形式在控制台打印测速数据 | -
 
 `timepot.report()`支持的 options：
 
@@ -182,7 +185,7 @@ timepot.mark('end', { group: 'page' });
 
 ## 外部依赖
 
-无外部依赖，原生实现。
+小巧，无外部依赖，原生实现。
 
 
 ## License
